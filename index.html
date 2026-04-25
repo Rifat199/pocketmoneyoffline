@@ -38,7 +38,14 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const provider = new GoogleAuthProvider();
+
+        const provider = new GoogleAuthProvider();
+// নিচের লাইনটি যোগ করুন যাতে আপনার নতুন Client ID টি কাজ করে
+provider.setCustomParameters({
+  'client_id': '389392910051-4do64nehv992gdohqv4bb8ekoemnaesc.apps.googleusercontent.com'
+});
+
+    
 
     // ১. অফলাইন পারসিস্টেন্স (এটিই ডাটা ডাউনলোড করে সেভ করে রাখে)
     enableIndexedDbPersistence(db).catch((err) => {
