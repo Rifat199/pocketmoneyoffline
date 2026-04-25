@@ -416,6 +416,15 @@ document.getElementById('inputNote').value = "";
 </head>
 <body>
 
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js')
+      .then(() => console.log("Service Worker Registered"));
+  }
+</script>
+
+    
+
     <div id="customToast" class="toast-container">
         <i id="toastIcon" class="fa-solid fa-circle-check"></i>
         <span id="toastMsg">মেসেজ এখানে আসবে</span>
