@@ -1,9 +1,0 @@
-{
-  "name": "POCKET MONEY",
-  "short_name": "POCKET MONEY",
-  "theme_color": "#c2185b",
-  "background_color": "#f4f4f4",
-  "display": "standalone",
-  "scope": "pocketmoneyoffline/",
-  "start_url": "https://rifat199.github.io/pocketmoneyoffline/"
-}
