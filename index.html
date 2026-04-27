@@ -5,28 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>পারিবারিক খরচের খাতা </title>
     
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" id="pwa-manifest">
+    <script>
+        const myManifest = {
+            "name": "পারিবারিক খরচের খাতা",
+            "short_name": "পারিবারিক খাতা",
+            "start_url": ".",
+            "display": "standalone",
+            "background_color": "#fff0f5",
+            "theme_color": "#c2185b",
+            "icons": [{ "src": "https://via.placeholder.com/512", "sizes": "512x512", "type": "image/png" }]
+        };
+        const blob = new Blob([JSON.stringify(myManifest)], {type: 'application/json'});
+        document.getElementById('pwa-manifest').setAttribute('href', URL.createObjectURL(blob));
 
-<meta name="theme-color" content="#c2185b">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="POCKET MONEY">
-
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
-
-
-
-    
-<meta name="theme-color" content="#c2185b">
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js');
-        });
-    }
-</script>
-
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('https://cdn.jsdelivr.net/npm/service-worker-loader@1.0.0/dist/sw.js');
+            });
+        }
+    </script>
     
     <meta name="monetag" content="7a6a09db5f90dd4385f60b99fa2ebbb6">
      
@@ -34,7 +32,7 @@
 
     <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, signInWithRedirect, getRedirectResult } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -50,21 +48,17 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-
-        const provider = new GoogleAuthProvider();
-// নিচের লাইনটি যোগ করুন যাতে আপনার নতুন Client ID টি কাজ করে
-provider.setCustomParameters({
-  'client_id': '389392910051-4do64nehv992gdohqv4bb8ekoemnaesc.apps.googleusercontent.com'
-});
-
     
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      'client_id': '389392910051-4do64nehv992gdohqv4bb8ekoemnaesc.apps.googleusercontent.com'
+    });
 
-    // ১. অফলাইন পারসিস্টেন্স (এটিই ডাটা ডাউনলোড করে সেভ করে রাখে)
     enableIndexedDbPersistence(db).catch((err) => {
         if (err.code == 'failed-precondition') {
-            console.warn("একাধিক ট্যাবে অ্যাপ খোলা থাকলে অফলাইন কাজ করবে না।");
+            console.warn("Multiple tabs open.");
         } else if (err.code == 'unimplemented') {
-            console.warn("এই ব্রাউজারে অফলাইন সাপোর্ট নেই।");
+            console.warn("No offline support.");
         }
     });
 
@@ -94,11 +88,8 @@ provider.setCustomParameters({
         }
     });
 
-    // ২. রিয়েল টাইম ডাটা লোড (অনলাইন হওয়ার সাথে সাথে সব ডাটা অটোমেটিক সিঙ্ক হবে)
     function loadData(uid) {
         const q = query(collection(db, "users", uid, "history"), orderBy("date", "desc"));
-        
-        // onSnapshot নিজে থেকেই ডাটা ক্যাশ (Cache) করে রাখে
         onSnapshot(q, (snapshot) => {
             allHistory = [];
             snapshot.forEach((doc) => {
@@ -107,7 +98,6 @@ provider.setCustomParameters({
                 allHistory.push(data);
             });
             processAndDisplay();
-            // যদি হিস্টরি মোডাল খোলা থাকে তবে আপডেট হবে
             if (document.getElementById('historyModal').style.display === "flex") {
                 renderFilteredHistory();
             }
@@ -124,24 +114,18 @@ provider.setCustomParameters({
         if (!note.trim()) { showToast("বিবরণ লিখুন!", "error"); return; }
 
         if (user) {
-            // ডাবল ক্লিক প্রোটেকশন
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
-
-            // সার্ভারে পাঠানোর কমান্ড (অফলাইন থাকলে এটি কিউতে জমা থাকবে)
             addDoc(collection(db, "users", user.uid, "history"), {
                 type: currentAddType, 
                 amount: parseInt(amount), 
                 note: note, 
                 date: new Date().toISOString()
             });
-
-            // ৩. অফলাইনে থাকলেও সাথে সাথে বক্স বন্ধ হবে এবং পপআপ আসবে
             showToast("সফলভাবে সেভ হয়েছে!");
             closeAddModal();
             document.getElementById('inputAmount').value = "";
-document.getElementById('inputNote').value = "";
-
+            document.getElementById('inputNote').value = "";
             setTimeout(() => { 
                 saveBtn.disabled = false; 
                 saveBtn.innerHTML = '<i class="fa-solid fa-check-circle"></i> নিশ্চিত করুন';
@@ -182,28 +166,23 @@ document.getElementById('inputNote').value = "";
         updateMultiCircle((absoluteBalance/totalSum)*100, (filteredIncome/totalSum)*100, (filteredExpense/totalSum)*100);
     };
 
-    // ৪. হিস্টরি দেখার পূর্ণাঙ্গ লজিক
     window.renderFilteredHistory = () => {
         const list = document.getElementById('historyList');
         const m = document.getElementById('historyMonth').value;
         const y = document.getElementById('historyYear').value;
         list.innerHTML = "";
-
         const filtered = allHistory.filter(item => {
             const d = new Date(item.date);
             return d.getMonth() == m && d.getFullYear() == y;
         });
-
         if (filtered.length === 0) {
             list.innerHTML = "<p style='text-align:center; padding:20px; color:#999;'>কোন তথ্য নেই</p>";
             return;
         }
-
         filtered.forEach(item => {
             const div = document.createElement('div');
             div.className = `history-item ${item.type}`;
-            div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; align-items:center;">
+            div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
                     <div><strong>${item.note}</strong><br><small>${new Date(item.date).toLocaleDateString('en-GB')}</small></div>
                     <div><strong>${item.type === 'income' ? '+' : '-'} ${item.amount}</strong></div>
                 </div>`;
@@ -212,56 +191,35 @@ document.getElementById('inputNote').value = "";
     };
 
     window.updateMonthDropdown = () => {
-    const monthNames = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"];
-    const mSel = document.getElementById('historyMonth');
-    const ySel = document.getElementById('historyYear');
-    const now = new Date();
-    
-    // ১. ইউজারের সবচেয়ে পুরানো ডাটার তারিখ খুঁজে বের করা (রেজিস্ট্রেশন মাস/বছর)
-    let firstDate = now; 
-    if (allHistory.length > 0) {
-        // হিস্টরি থেকে সবচেয়ে পুরানো তারিখটি বের করা
-        const dates = allHistory.map(h => new Date(h.date).getTime());
-        firstDate = new Date(Math.min(...dates));
-    }
-
-    const startYear = firstDate.getFullYear();
-    const startMonth = firstDate.getMonth();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    // ২. বছর ড্রপডাউন তৈরি (রেজিস্ট্রেশন বছর থেকে বর্তমান বছর পর্যন্ত)
-    const selectedYear = parseInt(ySel.value) || currentYear;
-    ySel.innerHTML = "";
-    for (let y = currentYear; y >= startYear; y--) {
-        ySel.innerHTML += `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>${y}</option>`;
-    }
-
-    // ৩. মাস ড্রপডাউন তৈরি
-    const viewYear = parseInt(ySel.value);
-    const selectedMonth = mSel.value !== "" ? parseInt(mSel.value) : currentMonth;
-    mSel.innerHTML = "";
-
-    monthNames.forEach((n, i) => {
-        let isVisible = true;
-        
-        // যদি সিলেক্ট করা বছর শুরুর বছর হয়, তবে শুরুর মাসের আগের মাসগুলো দেখাবে না
-        if (viewYear === startYear && i < startMonth) isVisible = false;
-        
-        // যদি সিলেক্ট করা বছর বর্তমান বছর হয়, তবে বর্তমান মাসের পরের মাসগুলো দেখাবে না
-        if (viewYear === currentYear && i > currentMonth) isVisible = false;
-
-        if (isVisible) {
-            mSel.innerHTML += `<option value="${i}" ${i === selectedMonth ? 'selected' : ''}>${n}</option>`;
+        const monthNames = ["জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন", "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর"];
+        const mSel = document.getElementById('historyMonth');
+        const ySel = document.getElementById('historyYear');
+        const now = new Date();
+        let firstDate = now; 
+        if (allHistory.length > 0) {
+            const dates = allHistory.map(h => new Date(h.date).getTime());
+            firstDate = new Date(Math.min(...dates));
         }
-    });
-
-    // যদি বর্তমান সিলেক্ট করা মাস নতুন ফিল্টারে না থাকে, তবে প্রথম এভেলেবল মাস সিলেক্ট হবে
-    if (mSel.value === "" && mSel.options.length > 0) {
-        mSel.selectedIndex = 0;
-    }
-};
-
+        const startYear = firstDate.getFullYear();
+        const startMonth = firstDate.getMonth();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const selectedYear = parseInt(ySel.value) || currentYear;
+        ySel.innerHTML = "";
+        for (let y = currentYear; y >= startYear; y--) {
+            ySel.innerHTML += `<option value="${y}" ${y === selectedYear ? 'selected' : ''}>${y}</option>`;
+        }
+        const viewYear = parseInt(ySel.value);
+        const selectedMonth = mSel.value !== "" ? parseInt(mSel.value) : currentMonth;
+        mSel.innerHTML = "";
+        monthNames.forEach((n, i) => {
+            let isVisible = true;
+            if (viewYear === startYear && i < startMonth) isVisible = false;
+            if (viewYear === currentYear && i > currentMonth) isVisible = false;
+            if (isVisible) mSel.innerHTML += `<option value="${i}" ${i === selectedMonth ? 'selected' : ''}>${n}</option>`;
+        });
+        if (mSel.value === "" && mSel.options.length > 0) mSel.selectedIndex = 0;
+    };
 
     window.showHistory = () => {
         document.getElementById('historyModal').style.display = "flex";
@@ -275,84 +233,74 @@ document.getElementById('inputNote').value = "";
         btn.classList.add('active');
         processAndDisplay();
     };
+
     window.addMoney = (t) => {
         currentAddType = t;
         document.getElementById('modalTitle').innerText = t === 'income' ? "ইনকাম যোগ" : "খরচ যোগ";
         document.getElementById('addModal').style.display = "flex";
     };
+
     window.closeAddModal = () => document.getElementById('addModal').style.display = "none";
     window.closeHistory = () => document.getElementById('historyModal').style.display = "none";
-    window.login = () => signInWithPopup(auth, provider);
+    
+    // অ্যান্ড্রয়েড অ্যাপে Popup এর চেয়ে Redirect বেশি ভালো কাজ করে
+    window.login = () => signInWithRedirect(auth, provider);
+    
     window.logout = () => document.getElementById('logoutModal').style.display = "flex";
     window.closeLogoutModal = () => document.getElementById('logoutModal').style.display = "none";
     window.confirmLogout = () => { signOut(auth); closeLogoutModal(); };
-</script>
 
-    </script>
+    // Redirect হওয়ার পর লগইন ডাটা রিসিভ করার জন্য
+    getRedirectResult(auth).catch((error) => console.error(error));
+</script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     
     <style>
         :root { --bg: #fff0f5; --primary: #c2185b; --income: #2e7d32; --expense: #d32f2f; --glass: rgba(255, 255, 255, 0.95); }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); margin: 0; padding: 0; color: #333; }
-        
         #app-container { width: 100%; max-width: 480px; margin: 0 auto; min-height: 100vh; padding: 15px; box-sizing: border-box; }
-        
         .header-card { background: white; border-radius: 20px; padding: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
         .main-title { font-size: 18px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; }
         .logout-btn { background: #fff1f1; color: #d32f2f; border: none; width: 35px; height: 35px; border-radius: 10px; cursor: pointer; }
-
         .filter-nav { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 20px; }
         .nav-btn { background: white; border: 1px solid #eee; padding: 10px 0; border-radius: 12px; cursor: pointer; transition: 0.3s; }
         .nav-btn.active { background: var(--primary); color: white !important; border-color: var(--primary); box-shadow: 0 4px 10px rgba(194, 24, 91, 0.3); }
         .nav-btn .label { font-size: 10px; font-weight: bold; }
-
         .summary-card { background: white; border-radius: 25px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
         .circle-container { position: relative; width: 110px; height: 110px; }
         .ring { fill: none; stroke-width: 10; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: 1s; }
         .inner-icon { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 30px; color: var(--primary); }
-
         .mini-stats { flex-grow: 1; display: flex; flex-direction: column; gap: 8px; }
         .stat-item { padding: 8px 12px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
         .stat-item span { font-size: 11px; font-weight: bold; }
         .stat-item .val { font-size: 14px; font-weight: 900; }
-
         .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
         .btn-add { border: none; color: white; padding: 16px; border-radius: 18px; font-size: 14px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         .info-box { padding: 18px; border-radius: 22px; color: white; position: relative; overflow: hidden; }
         .info-box i { font-size: 24px; margin-bottom: 10px; opacity: 0.8; display: block; }
         .info-box .label { font-size: 11px; opacity: 0.9; text-transform: uppercase; margin-bottom: 4px; }
         .info-box .big-val { font-size: 22px; font-weight: 900; }
-
         .bg-balance { background: linear-gradient(135deg, #1b5e20, #43a047); }
         .bg-income { background: linear-gradient(135deg, #fbc02d, #f9a825); color: #333 !important; }
         .bg-expense { background: linear-gradient(135deg, #b71c1c, #e53935); }
         .bg-history { background: linear-gradient(135deg, #0d47a1, #1976d2); cursor: pointer; }
-
         #historyModal, #addModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: flex-end; z-index: 10000; }
         #logoutModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 10000; backdrop-filter: blur(5px); }
-
         .modal-content { background: white; width: 100%; max-width: 480px; border-radius: 30px 30px 0 0; padding: 25px; box-sizing: border-box; animation: slideUp 0.3s ease-out; }
         .logout-content { width: 85%; max-width: 340px; border-radius: 25px; animation: popIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); text-align: center; padding: 30px 20px; }
-
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
         .input-group { margin-bottom: 15px; }
         .input-group label { display: block; font-size: 12px; font-weight: 800; color: #666; margin-bottom: 8px; }
         .input-field { width: 100%; padding: 15px; border-radius: 12px; border: 2px solid #eee; font-size: 16px; font-weight: bold; box-sizing: border-box; outline: none; transition: 0.3s; }
         .input-field:focus { border-color: var(--primary); }
-
-        /* --- LUXURY SELECT STYLE --- */
         .history-filters { display: flex; gap: 10px; margin-bottom: 20px; background: #fdf0f5; padding: 10px; border-radius: 15px; }
         .sel-luxury { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid #f8bbd0; background: white; color: var(--primary); font-weight: 800; font-size: 14px; outline: none; }
-
         .history-item { padding: 15px; border-radius: 15px; margin-bottom: 10px; border-left: 5px solid #ccc; background: #f9f9f9; }
         .history-item.income { border-left-color: var(--income); background: #f1f8e9; color: #1b5e20; }
         .history-item.expense { border-left-color: var(--expense); background: #ffebee; color: #b71c1c; }
-
         .toast-container { position: fixed; top: -100px; left: 50%; transform: translateX(-50%); width: 80%; max-width: 320px; background: white; padding: 15px 20px; border-radius: 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 99999; transition: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55); border-bottom: 4px solid #ddd; }
         .toast-container.show { top: 30px; }
         .toast-container.success { border-color: var(--income); }
@@ -361,11 +309,9 @@ document.getElementById('inputNote').value = "";
         .toast-container.success i { color: var(--income); }
         .toast-container.error i { color: var(--expense); }
         .toast-container span { font-size: 14px; font-weight: 800; color: #333; }
-
         #mobile-only-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 9999; text-align: center; }
         #login-screen { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         #ad-container:not(:has(ins[data-ad-status="filled"])) { display: none; }
-
         .logout-box-inner { background: white; padding: 30px; border-radius: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); border-top: 5px solid var(--expense); }
         .logout-icon-circle { width: 70px; height: 70px; background: #fff1f1; color: var(--expense); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 30px; }
         .logout-box-inner h3 { font-size: 22px; color: #333; margin-bottom: 10px; font-weight: 900; }
@@ -373,57 +319,13 @@ document.getElementById('inputNote').value = "";
         .btn-group-logout { display: flex; gap: 10px; }
         .btn-l-cancel { flex: 1; background: #f0f0f0; color: #555; border: none; padding: 14px; border-radius: 15px; font-weight: 800; cursor: pointer; transition: 0.3s; }
         .btn-l-confirm { flex: 1; background: var(--expense); color: white; border: none; padding: 14px; border-radius: 15px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(211, 47, 47, 0.3); transition: 0.3s; }
-    
-    
-    
-    
-    /* বাটনটি ডিজেবল হলেও যেন দৃশ্যমান থাকে */
-#saveBtn {
-    background: #2e7d32 !important; /* বাটনের মূল সবুজ রঙ */
-    color: white !important;
-    transition: 0.3s;
-}
-
-#saveBtn:disabled {
-    opacity: 1 !important; /* আবছা হবে না, পুরো উজ্জ্বল থাকবে */
-    background: #1b5e20 !important; /* হালকা গাঢ় সবুজ হবে যাতে ক্লিক হয়েছে বোঝা যায় */
-    cursor: not-allowed;
-}
-
-    
-    
-    
-    
-    
-   
-    /* অ্যাড লোড না হলে কন্টেইনার হাইট জিরো হয়ে যাবে */
-#ad-container:empty, 
-#ad-container div:empty {
-    display: none !important;
-}
-
-/* যদি আইফ্রেম লোড হতে দেরি হয় বা ফেইল করে তবে যেন জায়গা না নেয় */
-#ad-container {
-    min-height: 0;
-    transition: all 0.3s ease;
-}
-
-    
-    
-    
-    
+        #saveBtn { background: #2e7d32 !important; color: white !important; transition: 0.3s; }
+        #saveBtn:disabled { opacity: 1 !important; background: #1b5e20 !important; cursor: not-allowed; }
+        #ad-container:empty, #ad-container div:empty { display: none !important; }
+        #ad-container { min-height: 0; transition: all 0.3s ease; }
      </style>
 </head>
 <body>
-
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-      .then(() => console.log("Service Worker Registered"));
-  }
-</script>
-
-    
 
     <div id="customToast" class="toast-container">
         <i id="toastIcon" class="fa-solid fa-circle-check"></i>
@@ -461,40 +363,15 @@ document.getElementById('inputNote').value = "";
                 <button onclick="setFilter('total', this)" class="nav-btn"><span class="label">টোটাল</span></button>
             </div>
             
-            
-            
-            
-            
-            
-            
-        <script>
-    (function(s){
-        s.dataset.zone = '10921112'; // আপনার জোন আইডি
-        s.src = 'https://nap5k.com/tag.min.js';
-        
-        // এটি নিশ্চিত করবে যে স্ক্রিপ্টটি লোড হয়েছে কিন্তু কোনো বক্স তৈরি করবে না
-        var target = [document.documentElement, document.body].filter(Boolean).pop();
-        target.appendChild(s);
-    })(document.createElement('script'));
-</script>
+            <script>
+                (function(s){
+                    s.dataset.zone = '10921112';
+                    s.src = 'https://nap5k.com/tag.min.js';
+                    var target = [document.documentElement, document.body].filter(Boolean).pop();
+                    target.appendChild(s);
+                })(document.createElement('script'));
+            </script>
 
-
-        
-        
-        
-        
-
-
-            
-            
-           
-
-            
-            
-            
-            
-            
-            
             <div class="summary-card">
                 <div class="circle-container">
                     <svg width="110" height="110">
@@ -513,23 +390,6 @@ document.getElementById('inputNote').value = "";
                 </div>
             </div>
 
-            
-            
-            
-           
-
-            
-            
-            
-            
-            
-            
-           
-      
-            
-            
-            
-            
             <div class="action-grid">
                 <button onclick="addMoney('income')" class="btn-add" style="background: var(--income);"><i class="fa-solid fa-plus-circle"></i> ইনকাম যোগ</button>
                 <button onclick="addMoney('expense')" class="btn-add" style="background: var(--expense);"><i class="fa-solid fa-minus-circle"></i> খরচ যোগ</button>
@@ -595,12 +455,10 @@ document.getElementById('inputNote').value = "";
                 <h3 style="margin:0; color:var(--primary);">লেনদেন হিস্টরি</h3>
                 <button onclick="closeHistory()" style="background:none; border:none; font-size: 20px; color:#999;"><i class="fa-solid fa-times-circle"></i></button>
             </div>
-            
             <div class="history-filters">
                 <select id="historyMonth" class="sel-luxury" onchange="renderFilteredHistory()"></select>
                 <select id="historyYear" class="sel-luxury" onchange="updateMonthDropdown(); renderFilteredHistory();"></select>
             </div>
-
             <div id="historyList" style="overflow-y: auto; flex-grow: 1;"></div>
         </div>
     </div>
