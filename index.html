@@ -15,14 +15,15 @@
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     const firebaseConfig = {
-        apiKey: "AIzaSyD3PLE0MU4IXFGuVqk-ZQgnlw0wGMYtKrw",
-        authDomain: "poket-money-fc0ff.firebaseapp.com",
-        databaseURL: "https://poket-money-fc0ff-default-rtdb.firebaseio.com",
-        projectId: "poket-money-fc0ff",
-        storageBucket: "poket-money-fc0ff.firebasestorage.app",
-        messagingSenderId: "131213229962",
-        appId: "1:131213229962:web:036f58cfa32a2fd8375273"
-    };
+  apiKey: "AIzaSyD2yuVKaeMuqpKdbCe8Z_FoMKByZiBPWsc",
+  authDomain: "pocketmoney-1993.firebaseapp.com",
+  projectId: "pocketmoney-1993",
+  storageBucket: "pocketmoney-1993.firebasestorage.app",
+  messagingSenderId: "978607529137",
+  appId: "1:978607529137:web:406ab4b67d377d0cad1690",
+  measurementId: "G-LPFE4BKP71"
+};
+
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
@@ -120,37 +121,58 @@ document.getElementById('inputNote').value = "";
     };
 
     window.processAndDisplay = () => {
-        let filteredIncome = 0, filteredExpense = 0, totalIncomeAllTime = 0, totalExpenseAllTime = 0;
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        
-        allHistory.forEach(item => {
-            const itemDateObj = new Date(item.date);
-            const itemTime = itemDateObj.getTime();
-            const amount = parseInt(item.amount) || 0;
-            if(item.type === 'income') totalIncomeAllTime += amount; else totalExpenseAllTime += amount;
+    let filteredIncome = 0, filteredExpense = 0;
+    let totalIncomeAllTime = 0, totalExpenseAllTime = 0;
+    
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    
+    // allHistory তে শুধুমাত্র লগইন করা ইউজারের ডাটাই আছে (যেহেতু onSnapshot এ uid ব্যবহার করেছেন)
+    allHistory.forEach(item => {
+        const itemDateObj = new Date(item.date);
+        const itemTime = itemDateObj.getTime();
+        const amount = parseInt(item.amount) || 0;
 
-            let isMatch = false;
-            if (currentFilter === 'today' && itemDateObj.toDateString() === now.toDateString()) isMatch = true;
-            else if (currentFilter === 'week' && itemTime >= todayStart - (7*24*60*60*1000)) isMatch = true;
-            else if (currentFilter === 'month' && itemTime >= todayStart - (30*24*60*60*1000)) isMatch = true;
-            else if (currentFilter === 'year' && itemTime >= todayStart - (365*24*60*60*1000)) isMatch = true;
-            else if (currentFilter === 'total') isMatch = true;
+        // ১. সব সময়ের মোট হিসাব (All Time)
+        if(item.type === 'income') {
+            totalIncomeAllTime += amount;
+        } else {
+            totalExpenseAllTime += amount;
+        }
 
-            if (isMatch) { if(item.type === 'income') filteredIncome += amount; else filteredExpense += amount; }
-        });
+        // ২. ফিল্টার অনুযায়ী হিসাব (Today/Week/Month)
+        let isMatch = false;
+        if (currentFilter === 'today' && itemDateObj.toDateString() === now.toDateString()) isMatch = true;
+        else if (currentFilter === 'week' && itemTime >= todayStart - (7*24*60*60*1000)) isMatch = true;
+        else if (currentFilter === 'month' && itemTime >= todayStart - (30*24*60*60*1000)) isMatch = true;
+        else if (currentFilter === 'year' && itemTime >= todayStart - (365*24*60*60*1000)) isMatch = true;
+        else if (currentFilter === 'total') isMatch = true;
 
-        const absoluteBalance = totalIncomeAllTime - totalExpenseAllTime;
-        document.querySelectorAll('.val')[0].innerText = absoluteBalance;
-        document.querySelectorAll('.val')[1].innerText = filteredIncome;
-        document.querySelectorAll('.val')[2].innerText = filteredExpense;
-        document.querySelectorAll('.big-val')[0].innerText = absoluteBalance;
-        document.querySelectorAll('.big-val')[1].innerText = filteredIncome;
-        document.querySelectorAll('.big-val')[2].innerText = filteredExpense;
-        
-        const totalSum = Math.abs(filteredIncome) + Math.abs(filteredExpense) || 1;
-        updateMultiCircle((absoluteBalance/totalSum)*100, (filteredIncome/totalSum)*100, (filteredExpense/totalSum)*100);
-    };
+        if (isMatch) {
+            if(item.type === 'income') filteredIncome += amount; 
+            else filteredExpense += amount;
+        }
+    });
+
+    // ৩. UI আপডেট (নিশ্চিত করুন ID গুলো সঠিক আছে)
+    const absoluteBalance = totalIncomeAllTime - totalExpenseAllTime;
+    
+    // বড় বক্সগুলোর আপডেট
+    document.querySelector('.bg-balance .big-val').innerText = absoluteBalance; 
+    document.querySelector('.bg-income .big-val').innerText = totalIncomeAllTime;
+    document.querySelector('.bg-expense .big-val').innerText = totalExpenseAllTime;
+
+    // ছোট স্ট্যাটস কার্ড আপডেট (আজ/সপ্তাহ/মাস অনুযায়ী)
+    const miniStats = document.querySelectorAll('.mini-stats .val');
+    miniStats[0].innerText = filteredIncome - filteredExpense; // ওই সময়ের ব্যালেন্স
+    miniStats[1].innerText = filteredIncome;
+    miniStats[2].innerText = filteredExpense;
+
+    // চার্ট আপডেট
+    const totalSum = Math.abs(filteredIncome) + Math.abs(filteredExpense) || 1;
+    updateMultiCircle((absoluteBalance/totalSum)*100, (filteredIncome/totalSum)*100, (filteredExpense/totalSum)*100);
+};
+
 
     // ৪. হিস্টরি দেখার পূর্ণাঙ্গ লজিক
     window.renderFilteredHistory = () => {
@@ -258,7 +280,7 @@ document.getElementById('inputNote').value = "";
     window.confirmLogout = () => { signOut(auth); closeLogoutModal(); };
 </script>
 
-    </script>
+    
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     
